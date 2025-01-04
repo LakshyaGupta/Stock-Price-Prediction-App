@@ -1,6 +1,8 @@
-streamlit
-scikit-learn
-yfinance
+Flask
+flask_cors
 pandas
-ta
-xgboost
+numpy
+matplotlib
+scikit-learn
+tensorflow
+gunicorn

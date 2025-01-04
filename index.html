@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Stock Prediction Dashboard</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <div class="container">
+    <h1>Stock Prediction Dashboard</h1>
+
+    <div class="password-section">
+      <h2>Enter Password to Access</h2>
+      <input type="password" id="passwordInput" placeholder="Enter Password">
+      <button onclick="checkPassword()">Submit</button>
+      <p id="passwordMessage" style="color: red; display: none;">Incorrect password. Try again.</p>
+    </div>
+
+    <div id="mainContent" style="display: none;">
+      <div class="form-section">
+        <h2>Upload Datasets</h2>
+        <form id="fileForm" enctype="multipart/form-data">
+          <input type="file" id="fileUpload" name="files" multiple>
+          <button type="button" onclick="uploadFiles()">Upload Files</button>
+        </form>
+      </div>
+
+      <div class="form-section">
+        <h2>Select Datasets for Analysis</h2>
+        <div id="datasetOptions"></div>
+        <button onclick="selectAllDatasets()">Select All</button>
+      </div>
+
+      <div class="form-section">
+        <h2>Analyze Timeframes</h2>
+        <label><input type="radio" name="timeframe" value="daily" checked> Daily</label>
+        <label><input type="radio" name="timeframe" value="weekly"> Weekly</label>
+        <label><input type="radio" name="timeframe" value="monthly"> Monthly</label>
+        <label><input type="radio" name="timeframe" value="yearly"> Yearly</label>
+        <button type="button" onclick="analyzeDatasets()">Analyze</button>
+      </div>
+
+      <div class="form-section">
+        <h2>Prediction Settings</h2>
+        <label for="timeStep">Time Steps:</label>
+        <input type="number" id="timeStep" value="60">
+        
+        <label for="predictionWeeks">Prediction Weeks:</label>
+        <input type="number" id="predictionWeeks" value="8">
+        
+        <button type="button" onclick="startPrediction()">Run Prediction</button>
+      </div>
+
+      <div id="analysisResults">
+        <h2>Analysis Results</h2>
+        <div id="patterns"></div>
+        <div id="anomalies"></div>
+      </div>
+
+      <div id="chartSection">
+        <h2>Prediction Results</h2>
+        <canvas id="predictionChart"></canvas>
+        <p id="predictionMessage" style="color: red; display: none;">No prediction results available.</p>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script>
+    const availableDatasets = [];
+    let selectedDatasets = [];
+    let chart;
+
+    function checkPassword() {
+      const password = document.getElementById('passwordInput').value;
+      if (password === 'Associate7!!7') {
+        document.querySelector('.password-section').style.display = 'none';
+        document.getElementById('mainContent').style.display = 'block';
+      } else {
+        document.getElementById('passwordMessage').style.display = 'block';
+      }
+    }
+
+    function populateDatasetOptions() {
+  fetch('/available-datasets')
+    .then((response) => response.json())
+    .then((data) => {
+      const datasetOptions = document.getElementById('datasetOptions');
+      datasetOptions.innerHTML = '';
+      data.datasets.forEach((dataset) => {
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.value = dataset;
+        checkbox.onchange = () => handleDatasetSelection(dataset, checkbox.checked);
+
+        const label = document.createElement('label');
+        label.innerText = dataset;
+        label.style.marginRight = '10px';
+
+        datasetOptions.appendChild(checkbox);
+        datasetOptions.appendChild(label);
+      });
+    })
+    .catch((error) => console.error('Error fetching datasets:', error));
+}
+
+
+    function handleDatasetSelection(dataset, isSelected) {
+      if (isSelected) {
+        selectedDatasets.push(dataset);
+      } else {
+        selectedDatasets = selectedDatasets.filter(item => item !== dataset);
+      }
+    }
+
+    function selectAllDatasets() {
+      selectedDatasets = [...availableDatasets];
+      const checkboxes = document.getElementById('datasetOptions').querySelectorAll('input');
+      checkboxes.forEach(checkbox => {
+        checkbox.checked = true;
+      });
+    }
+
+    function uploadFiles() {
+      const formData = new FormData(document.getElementById('fileForm'));
+      fetch('/upload', {
+        method: 'POST',
+        body: formData
+      })
+      .then(response => response.json())
+      .then(data => {
+        availableDatasets.push(...data.datasets);
+        populateDatasetOptions(availableDatasets);
+        alert('Files uploaded and datasets loaded.');
+      })
+      .catch(error => console.error('Error uploading files:', error));
+    }
+
+    function analyzeDatasets() {
+  console.log('Selected Datasets:', selectedDatasets); // Log selected datasets
+  fetch('/analyze', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ datasets: selectedDatasets }),
+  })
+    .then((response) => {
+      if (!response.ok) {
+        throw new Error(`Server responded with ${response.status}`);
+      }
+      return response.json();
+    })
+    .then((data) => {
+      console.log('Analysis Successful:', data.message);
+    })
+    .catch((error) => {
+      console.error('Error analyzing datasets:', error);
+    });
+}
+
+
+    
+    function startPrediction() {
+      const timeStep = parseInt(document.getElementById('timeStep').value);
+      const predictionWeeks = parseInt(document.getElementById('predictionWeeks').value);
+
+      fetch('/predict', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        datasets: selectedDatasets,
+        timeStep: 60,
+        predictionWeeks: 8,
+      }),
+    })
+      .then((response) => response.json())
+      .then((data) => {
+        // Handle the prediction response
+        console.log(data);
+      })
+      .catch((error) => console.error('Error during prediction:', error));
+
+    }
+
+    function updateChart(labels, data) {
+      const ctx = document.getElementById('predictionChart').getContext('2d');
+      if (chart) chart.destroy();
+      chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [{
+            label: 'Future Predictions',
+            data,
+            borderColor: 'blue',
+            fill: false,
+          }]
+        },
+      });
+    }
+  </script>
+</body>
+</html>
